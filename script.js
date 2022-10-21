@@ -25,18 +25,26 @@ class Line {
   }
 
   collapse() {
-    if (this.x1 > this.x2) {
+    if (this.x1 - this.x2 > 1) {
       this.x1 = this.x1 - (this.x1 - this.x2) / 100;
       this.x2 = this.x2 + (this.x1 - this.x2) / 100;
-    } else {
+      if (this.x1 - this.x2 <= 1) {
+        this.x1 = 0;
+        this.x2 = 0;
+      }
+    } else if (this.x2 - this.x1 > 1) {
       this.x1 = this.x1 + (this.x2 - this.x1) / 100;
       this.x2 = this.x2 - (this.x2 - this.x1) / 100;
+      if (this.x2 - this.x1 <= 1) {
+        this.x1 = 0;
+        this.x2 = 0;
+      }
     }
 
-    if (this.y1 > this.y2) {
+    if (this.y1 - this.y2 > 1) {
       this.y1 = this.y1 - (this.y1 - this.y2) / 100;
       this.y2 = this.y2 + (this.y1 - this.y2) / 100;
-    } else {
+    } else if (this.y2 - this.y1 > 1) {
       this.y1 = this.y1 + (this.y2 - this.y1) / 100;
       this.y2 = this.y2 - (this.y2 - this.y1) / 100;
     }
@@ -46,7 +54,7 @@ class Line {
 let arr = [];
 let linesArray = [];
 
-canvas.addEventListener("click", (event) => {
+const createLine = (event) => {
   if (arr.length < 2) {
     arr.push(event.offsetX);
     arr.push(event.offsetY);
@@ -65,10 +73,12 @@ canvas.addEventListener("click", (event) => {
     createDots(linesArray);
     arr = [];
   }
-});
+};
+
+canvas.addEventListener("click", createLine);
 
 let draw = false;
-const array = [];
+let array = [];
 let mouse = {};
 let start_coords = {};
 let resault_coords = {};
@@ -80,7 +90,7 @@ window.addEventListener("contextmenu", () => {
   resault_coords = {};
 });
 
-canvas.addEventListener("mousedown", (event) => {
+const startLine = (event) => {
   if (draw) {
     draw = false;
     array.push([
@@ -96,8 +106,10 @@ canvas.addEventListener("mousedown", (event) => {
     start_coords.y = mouse.y;
     draw = true;
   }
-});
-canvas.addEventListener("mousemove", (event) => {
+};
+canvas.addEventListener("mousedown", startLine);
+
+const endLine = (event) => {
   if (draw) {
     mouse.x = event.offsetX;
     mouse.y = event.offsetY;
@@ -107,7 +119,7 @@ canvas.addEventListener("mousemove", (event) => {
       el.draw();
     });
     createDots(linesArray);
-
+    // ctx.lineWidth = 5;
     ctx.beginPath();
     ctx.moveTo(start_coords.x, start_coords.y);
     ctx.lineTo(mouse.x, mouse.y);
@@ -115,28 +127,35 @@ canvas.addEventListener("mousemove", (event) => {
     createDinamicDots(linesArray, start_coords, mouse);
     ctx.closePath();
   }
-});
+};
+canvas.addEventListener("mousemove", endLine);
 
 const createDots = (linesArray) => {
+  //щоб не було Infinity при визначенні коефіцієнтів,
+  //якщо лінія горизонтальна і різниця координат дає нуль,
+  //до дільника додав коефіцієнт похибки 0,001.
+
+  let k = 1 / 1000;
+
   if (linesArray.length >= 2) {
     for (let i = 0; i < linesArray.length; i++) {
       for (let j = i + 1; j < linesArray.length; j++) {
         let d1 =
           (linesArray[i].x2 * linesArray[i].y1 -
             linesArray[i].x1 * linesArray[i].y2) /
-          (linesArray[i].x2 - linesArray[i].x1);
+          (linesArray[i].x2 - linesArray[i].x1 + k);
         let d2 =
           (linesArray[j].x2 * linesArray[j].y1 -
             linesArray[j].x1 * linesArray[j].y2) /
-          (linesArray[j].x2 - linesArray[j].x1);
+          (linesArray[j].x2 - linesArray[j].x1 + k);
         let k1 =
           (linesArray[i].y2 - linesArray[i].y1) /
-          (linesArray[i].x2 - linesArray[i].x1);
+          (linesArray[i].x2 - linesArray[i].x1 + k);
         let k2 =
           (linesArray[j].y2 - linesArray[j].y1) /
-          (linesArray[j].x2 - linesArray[j].x1);
-        let x = (d2 - d1) / (k1 - k2);
-        let y = (k1 * (d2 - d1)) / (k1 - k2) + d1;
+          (linesArray[j].x2 - linesArray[j].x1 + k);
+        let x = Math.round((d2 - d1) / (k1 - k2));
+        let y = Math.round((k1 * (d2 - d1)) / (k1 - k2) + d1);
         if (
           ((x >= linesArray[i].x1 && x <= linesArray[i].x2) ||
             (x <= linesArray[i].x1 && x >= linesArray[i].x2)) &&
@@ -155,21 +174,23 @@ const createDots = (linesArray) => {
 };
 
 const createDinamicDots = (linesArray, start_coords, mouse) => {
+  let k = 1 / 1000;
+
   if (linesArray.length >= 1) {
     for (let i = 0; i < linesArray.length; i++) {
       let d1 =
         (linesArray[i].x2 * linesArray[i].y1 -
           linesArray[i].x1 * linesArray[i].y2) /
-        (linesArray[i].x2 - linesArray[i].x1);
+        (linesArray[i].x2 - linesArray[i].x1 + k);
       let d2 =
         (mouse.x * start_coords.y - start_coords.x * mouse.y) /
-        (mouse.x - start_coords.x);
+        (mouse.x - start_coords.x + k);
       let k1 =
         (linesArray[i].y2 - linesArray[i].y1) /
-        (linesArray[i].x2 - linesArray[i].x1);
-      let k2 = (mouse.y - start_coords.y) / (mouse.x - start_coords.x);
-      let x = (d2 - d1) / (k1 - k2);
-      let y = (k1 * (d2 - d1)) / (k1 - k2) + d1;
+        (linesArray[i].x2 - linesArray[i].x1 + k);
+      let k2 = (mouse.y - start_coords.y) / (mouse.x - start_coords.x + k);
+      let x = Math.round((d2 - d1) / (k1 - k2));
+      let y = Math.round((k1 * (d2 - d1)) / (k1 - k2) + d1);
       if (
         ((x >= linesArray[i].x1 && x <= linesArray[i].x2) ||
           (x <= linesArray[i].x1 && x >= linesArray[i].x2)) &&
@@ -199,15 +220,36 @@ collapseLinesBtn.addEventListener("click", () => {
 });
 
 const collapseLines = () => {
+  let linesArrayClone = linesArray;
+
+  // canvas.removeEventListener("click");
+
+  canvas.removeEventListener("click", createLine);
+  canvas.removeEventListener("mousedown", startLine);
+  canvas.removeEventListener("mousemove", endLine);
+
+  draw = false;
+  mouse = {};
+  start_coords = {};
+  resault_coords = {};
+  linesArray = [];
+  array = [];
+  arr = [];
+
   const int = setInterval(() => {
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-    linesArray.forEach((el) => {
+    linesArrayClone.forEach((el) => {
       el.collapse();
       el.draw();
       createDots(linesArray);
     });
-  }, 0);
+  }, 10);
+
   setTimeout(() => {
+    canvas.addEventListener("click", createLine);
+    canvas.addEventListener("mousedown", startLine);
+    canvas.addEventListener("mousemove", endLine);
+
     clearInterval(int);
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   }, 3000);
